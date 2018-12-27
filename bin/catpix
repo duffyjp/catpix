@@ -4,7 +4,7 @@
 # Distributed under the MIT License (see LICENSE.txt)
 
 require 'docopt'
-require 'catpix'
+require_relative '../lib/catpix.rb'
 
 doc = <<DOCOPT
 Print images in the terminal.

@@ -1,9 +1,10 @@
 # Copyright (c) 2015 Radek Pazdera <me@radek.io>
 # Distributed under the MIT License (see LICENSE.txt)
 
-require "rmagick"
+require "mini_magick"
 require "tco"
 require "terminfo"
+require 'awesome_print'
 
 module Catpix
   private
@@ -73,14 +74,14 @@ module Catpix
   end
 
   def self.load_image(path)
-    Magick::Image::read(path).first
+    MiniMagick::Image.open(path)
   end
 
   # Scale the image down based on the limits while keeping the aspect ratio
   def self.resize!(img, limit_x=0, limit_y=0)
     tw, th = get_screen_size
-    iw = img.columns
-    ih = img.rows
+    iw = img.width
+    ih = img.height
 
     width = if limit_x > 0
       (tw * limit_x).to_i
@@ -96,15 +97,16 @@ module Catpix
 
     # Resize the image if it's bigger than the limited viewport
     if iw > width or ih > height
-      img.change_geometry "#{width}x#{height}" do |cols, rows, img_handle|
-        img_handle.resize! (cols).to_i, (rows).to_i
+      img.resize "#{width}X#{height}" do |width, height, img_handle|
+        img_handle.resize! (width).to_i, (height).to_i
       end
     end
   end
 
   # Returns the normalised RGB of a ImageMagick's pixel
   def self.get_normal_rgb(pixel)
-    [pixel.red, pixel.green, pixel.blue].map { |v| 255*(v/65535.0) }
+    #pixel "#FFFAFF"
+    [pixel[1..2], pixel[3..4], pixel[5..6]].map { |v| Integer("0x#{v}") }
   end
 
   # Determine the margins based on the centering options
@@ -112,7 +114,7 @@ module Catpix
     margins = {}
     tw, th = get_screen_size
 
-    x_space = tw - img.columns
+    x_space = tw - img.width
     if center_x
       margins[:left] = x_space / 2
       margins[:right] = x_space / 2 + x_space % 2
@@ -121,7 +123,7 @@ module Catpix
       margins[:right] = x_space
     end
 
-    y_space = th - img.rows
+    y_space = th - img.height
     if center_y
       margins[:top] = y_space / 2
       margins[:bottom] = y_space / 2 + y_space % 2
@@ -172,12 +174,12 @@ module Catpix
   def self.do_print_image_lr(img, margins, options)
     print prep_vert_margin margins[:top], margins[:colour]
 
-    0.upto(img.rows - 1) do |row|
+    0.upto(img.height - 1) do |row|
       buffer = prep_horiz_margin margins[:left], margins[:colour]
-      0.upto(img.columns - 1) do |col|
+      0.upto(img.width - 1) do |col|
         pixel = img.pixel_color col, row
 
-        buffer += if pixel.opacity == MAX_OPACITY
+        buffer += if false # pixel.opacity == MAX_OPACITY
           prep_lr_pixel options[:bg]
         else
           prep_lr_pixel get_normal_rgb pixel
@@ -194,19 +196,19 @@ module Catpix
   def self.do_print_image_hr(img, margins, options)
     print prep_vert_margin margins[:top], margins[:colour]
 
-    0.step(img.rows - 1, 2) do |row|
+    0.step(img.height - 1, 2) do |row|
       # line buffering makes it about 20% faster
       buffer = prep_horiz_margin margins[:left], margins[:colour]
-      0.upto(img.columns - 1) do |col|
+      0.upto(img.width - 1) do |col|
         top_pixel = img.pixel_color col, row
-        colour_top = if top_pixel.opacity < MAX_OPACITY
+        colour_top = if true #top_pixel.opacity < MAX_OPACITY
           get_normal_rgb top_pixel
         else
           options[:bg]
         end
 
         bottom_pixel = img.pixel_color col, row + 1
-        colour_bottom = if bottom_pixel.opacity < MAX_OPACITY
+        colour_bottom = if true #bottom_pixel.opacity < MAX_OPACITY
           get_normal_rgb bottom_pixel
         else
           options[:bg]
@@ -219,5 +221,22 @@ module Catpix
     end
 
     print prep_vert_margin margins[:bottom], margins[:colour]
+  end
+end
+
+
+# Add missing pixel_color method
+# https://gist.github.com/peter-leonov/5c9860d7a4a494ffb341
+module MiniMagick
+  class Image
+    def pixel_color(x, y)
+      run_command("convert", "#{path}[1x1+#{x.to_i}+#{y.to_i}]", 'txt:').split("\n").each do |line|
+        return $1 if /^0,0:.*(#[0-9a-fA-F]+)/.match(line)
+      end
+      nil
+    end
+
+
+
   end
 end

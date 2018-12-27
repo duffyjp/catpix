@@ -1,8 +1,8 @@
 # Copyright (c) 2015 Radek Pazdera <me@radek.io>
 # Distributed under the MIT License (see LICENSE.txt)
 
-require "catpix/version"
-require "catpix/private"
+require_relative "./catpix/version"
+require_relative "./catpix/private"
 
 # Provides a function to print images in the terminal. A range of different
 # formats is supported (check out what ImageMagick supports). Under the hood,
